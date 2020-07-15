@@ -1,0 +1,122 @@
+body {
+  position: relative;
+  font-family: Roboto, Helvetica, Arial, sans-serif;
+  background-color: antiquewhite;
+}
+
+*, *:before, *:after {
+    box-sizing: border-box;
+  }
+  
+  #container {
+    top: 66px;
+    position: relative;
+    max-width: 600px;
+  }
+  
+  .list-item {  
+    position: absolute;
+    top: 0;
+    left: 0;  
+    width: 100%;
+    visibility: hidden;
+    //z-index: 1000 !important;
+  }
+
+  .to-replace-content {
+    margin: 16px 0;
+  }
+
+  p.order {
+    margin: 0;
+    margin-top: 15px;
+    margin-bottom: 5px;
+  }
+  
+  .item-content {
+    border: 0px solid rgba(123, 123, 123, 0.498039);
+    border-radius: 4px;
+    padding-left: 32px;
+    background-color: rgb(255, 255, 255);
+    box-shadow: rgba(0,0,0,0.2) 0px 1px 2px 0px;
+    //
+    display: flex;
+    flex-direction: row;
+  }
+
+  .item-info {
+    word-break: break-all;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .item-action {
+    min-height: 149px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .item-action button:hover {
+    cursor: pointer;
+    box-shadow: rgba(0,0,0,0.2) 0px 1px 2px 0px;
+  }
+  
+  .item-action button {
+    margin: 2px 0;
+    padding: 0;
+    border: 2px solid rgb(118, 118, 118);
+    height: 39px;
+  }
+
+  textarea {
+    box-sizing: border-box;
+    resize: none;
+    overflow:hidden;
+    outline: none;
+    margin: 0;
+    border: 1px solid rgb(195, 195, 195);
+    padding: 5px;
+    font-family: inherit;  
+    font-size: inherit;
+    width: 100%;
+  }
+
+  form {
+    margin: 0;
+    border: 0;
+    padding: 0;
+    width: 100%;
+  }
+
+  div.list-item[data-complete='true'] {
+      div.item-content {
+        background-color: greenyellow;
+        div.item-info {
+          text-decoration: line-through;
+          color: gray;
+        }
+      }
+  }
+
+  #search {
+    position: fixed;
+    top: 64px;
+    left: 5px;
+    z-index: 1010;
+    height: 36px;
+    min-width: 300px;
+    //box-shadow: rgba(0,0,0,0.2) 0px 1px 2px 0px;
+  }
+
+  .hide {
+    display: none;
+  }
+
+  mark {
+    background-color: yellow;
+    padding: 0;
+  }
