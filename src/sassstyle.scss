@@ -109,7 +109,11 @@ body {
     z-index: 1010;
     height: 36px;
     min-width: 300px;
-    //box-shadow: rgba(0,0,0,0.2) 0px 1px 2px 0px;
+    opacity: 0.8;
+  }
+
+  #search:hover {
+    opacity: 1;
   }
 
   .hide {

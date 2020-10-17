@@ -18,7 +18,7 @@ function changeIndex(item, to) {
     // Change position in array
     arrayMove(sortables, item.index, to);
     // Set index for each sortable
-    sortables.forEach((sortable, index) => sortable.setIndex(index));
+    sortables.forEach((sortable, index) => sortable.setIndexWithDb(index));
 }
 
 function createSortable(element, index) {
@@ -30,7 +30,7 @@ function createSortable(element, index) {
       duration: 0.3,
       boxShadow: "rgba(0,0,0,0.2) 0px 16px 32px 0px",
       force3D: true,
-      scale: 1.06,
+      //scale: 1.06,
       paused: true
     });
 
@@ -39,7 +39,8 @@ function createSortable(element, index) {
       onDrag: dragAction,
       onDragEnd: upAction,
       cursor: "inherit",
-      activeCursor: "move",    
+      activeCursor: "move",
+      bounds: document.querySelector('body'),  
       type: "x,y",
       allowContextMenu: true,
       zIndexBoost: false
@@ -52,6 +53,8 @@ function createSortable(element, index) {
       startIndex: null,
       index:    index,
       setIndex: setIndex,
+      setIndexWithDb: setIndexWithDb,
+      setIndexSearch: setIndexSearch,
       location: {
         y: null,
         height: null,
@@ -86,6 +89,37 @@ function createSortable(element, index) {
         // Don't layout elem if it being dragged
         if (!dragger.isDragging) layout();
       }
+    }
+
+    function setIndexWithDb(index) {
+      if (sortable.index !== index) {
+
+        sortable.index = index;
+        order.textContent = `#${index + 1}`;
+
+        setY();
+        setCenter();
+
+        db.collection("users")
+        .doc(auth.currentUser.uid)
+        .collection('list')
+        .doc(sortable.element.id)
+        .update({
+          index: index
+        })
+        
+        // Don't layout elem if it being dragged
+        if (!dragger.isDragging) layout();
+      }
+    }
+
+    function setIndexSearch(index) {
+      sortable.index = index;
+      order.textContent = `#${index + 1}`;
+
+      setY();
+      //setCenter();
+      layout();
     }
 
 
@@ -197,10 +231,21 @@ auth.onAuthStateChanged(user => {//RENDER ACCORDING TO FIREBASE CHANGES!!!!!
     if (user) {
         console.log('user logged in:\n', user.uid);
 
-        //db conversation based on logged in user               //тут сортыровка задатою!!! //list-group-item
-        db.collection('users').doc(user.uid).collection('list').orderBy("createdate", "asc").onSnapshot(snapshot => {
-            snapshot.docChanges().forEach(function(change) {
+        function snapshotCheck(invoctimes) {
+          return function() {
+            if (invoctimes === 0 || invoctimes === 1) {invoctimes++};
+            return invoctimes === 1
+          }
+        }
 
+        const snapshotInit = snapshotCheck(0);
+
+        //db conversation based on logged in user               //тут сортыровка задатою!!! //list-group-item
+        db.collection('users').doc(user.uid).collection('list').orderBy("index", "desc").onSnapshot(snapshot => {
+
+            let initSnap = snapshotInit();
+
+            snapshot.docChanges().forEach(function(change) {
               function formatDate(date) {
                 return `${date.getDate()}.${date.getMonth()}.${date.getFullYear()} ${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`
               }
@@ -226,18 +271,28 @@ auth.onAuthStateChanged(user => {//RENDER ACCORDING TO FIREBASE CHANGES!!!!!
                 if (change.type === "added") {
                   container.insertAdjacentHTML("afterbegin", liTemplate());
                   const item = document.getElementById(change.doc.id);
-                  //const itemIndex = container.childElementCount - 1;
                   setTimeout(function() {
                     const sortable = createSortable(item, null);
                     sortables.unshift(sortable);
                     total = sortables.length;
                     sortable.element.style.visibility = "visible";
-                    sortables.forEach((sortable, index) => {
-                      sortable.setIndex(index);
-                      if (index === total - 1) {
-                        container.style.height = `${sortable.location.y + sortable.location.height + 62}px`;
-                      }
-                    });
+                    if (initSnap) {
+                      console.log('initSnap: ', initSnap);
+                      sortables.forEach((sortable, index) => {
+                        sortable.setIndex(index);
+                        if (index === total - 1) {
+                          container.style.height = `${sortable.location.y + sortable.location.height + 62}px`;
+                        }
+                      });
+                    } else {
+                      console.log('initSnap: ', initSnap);
+                      sortables.forEach((sortable, index) => {
+                        sortable.setIndexWithDb(index);
+                        if (index === total - 1) {
+                          container.style.height = `${sortable.location.y + sortable.location.height + 62}px`;
+                        }
+                      });
+                    }
                   }, 0)
                 }
 
@@ -250,6 +305,8 @@ auth.onAuthStateChanged(user => {//RENDER ACCORDING TO FIREBASE CHANGES!!!!!
                     sortable.element.dataset.complete = 'false'
                   }
 
+
+
                   if (sortable.element.querySelector('form')) {
                     const div = sortable.element.querySelector('.to-replace-content');
                     div.innerHTML = `${change.doc.data().content.trim()}`;
@@ -258,6 +315,7 @@ auth.onAuthStateChanged(user => {//RENDER ACCORDING TO FIREBASE CHANGES!!!!!
                     itemActions.innerHTML = `<button class="complete"><img src="https://img.icons8.com/cute-clipart/32/000000/checkmark.png"/></button><button class="edit"><img src="https://img.icons8.com/cotton/32/000000/edit--v2.png"/></button><button class="delete"><img src="https://img.icons8.com/cute-clipart/32/000000/delete-sign.png"/></button>`;
 
                     sortable.dragger.enable();
+                    document.querySelector('#search').disabled = false;
                     setTimeout(resetAllLayout, 300);
                   }
                 }
@@ -267,9 +325,11 @@ auth.onAuthStateChanged(user => {//RENDER ACCORDING TO FIREBASE CHANGES!!!!!
                   sortable.dragger.disable();
                   sortable.element.remove();
                   sortables.splice(sortable.index, 1);
-                  sortables.forEach((sortable, index) => sortable.setIndex(index));
+                  //if (document.querySelector('#search').value === '') {
+                    sortables.forEach((sortable, index) => sortable.setIndex(index));
+                    container.style.height = `${sortables[sortables.length - 1].location.y + sortables[sortables.length - 1].location.height + 62}px`;
+                  //}
                   total = sortables.length;
-                  container.style.height = `${sortables[sortables.length - 1].location.y + sortables[sortables.length - 1].location.height + 62}px`;
                 }
             });
         }, function (err) {
@@ -291,85 +351,95 @@ container.addEventListener('click', (ev) => {
   if (ev.target.closest('button')) {
     if (ev.target.closest('button').classList.contains('edit')) {
 
-      const listItem = ev.target.closest('.list-item');
-      const listItemId = listItem.id;
+      //document.querySelector('#search').disabled = true;
+      
+      if (document.querySelector('#search').value === '') {
 
-      const sortable = sortables.find(sortable => sortable.element.id === listItemId);
-      sortable.dragger.disable();
+        document.querySelector('#search').disabled = true;
 
-      const textToEdit = listItem.querySelector('.to-replace-content').innerText.trim();
-      const div = listItem.querySelector('.to-replace-content');
-      const dubContent = div.innerHTML;
+        const listItem = ev.target.closest('.list-item');
+        const listItemId = listItem.id;
 
-      div.innerHTML = `<form id="edit-item-form-${listItemId}"><textarea id="edit-item-input-${listItemId}" placeholder="Update the item" spellcheck="false" rows="1">${textToEdit}</textarea></form>`;
+        const sortable = sortables.find(sortable => sortable.element.id === listItemId);
+        sortable.dragger.disable();
 
-      setInitTextAreaHeight();
-      function setInitTextAreaHeight() {
-        const area = div.querySelector('textarea');
-        //const offset = this.offsetHeight - this.clientHeight;
-        const offset = 1 + 1;//borders
-        area.style.height = 'auto';
-        area.style.height = area.scrollHeight + offset + 'px';
-      }
+        const textToEdit = listItem.querySelector('.to-replace-content').innerText.trim();
+        const div = listItem.querySelector('.to-replace-content');
+        const dubContent = div.innerHTML;
 
-      setTimeout(resetAllLayout, 50);
+        div.innerHTML = `<form id="edit-item-form-${listItemId}"><textarea id="edit-item-input-${listItemId}" placeholder="Update the item" spellcheck="false" rows="1">${textToEdit}</textarea></form>`;
 
-      div.querySelector('textarea').addEventListener('input', autoResize);
-             
-      function autoResize() {
-        const offset = 1 + 1;//borders
-        this.style.height = 'auto';
-        this.style.height = event.target.scrollHeight + offset + 'px';
-        setTimeout(resetAllLayout, 50);
-      }
-
-      const itemActions = listItem.querySelector('.item-action');
-      const dubActions = itemActions.innerHTML;
-
-      itemActions.innerHTML = `<button type="submit" form="edit-item-form-${listItemId}"><img class="update" src="https://img.icons8.com/nolan/32/approve-and-update.png"/></button><button id="cancel-edit-${listItemId}"><img class="cancel" src="https://img.icons8.com/color/32/000000/rollback.png"/></button>`
-
-        const cancelBtn = listItem.querySelector(`#cancel-edit-${listItemId}`);
-        cancelBtn.addEventListener('click', () => {
-          div.innerHTML = dubContent;
-          itemActions.innerHTML = dubActions;
-          sortable.dragger.enable();
-          setTimeout(resetAllLayout, 50);
-        })
-
-        const editForm = listItem.querySelector(`#edit-item-form-${listItemId}`);
-        editForm.addEventListener('submit', updateRequest);
-
-        function updateRequest(e) {
-          e.preventDefault();
-          db.collection("users")
-            .doc(auth.currentUser.uid)
-            .collection('list')
-            .doc(listItemId)
-            .update({
-              content: editForm[`edit-item-input-${listItemId}`].value.trim(),
-            })
-            .then(() => {
-              console.log('updated')
-            })
+        setInitTextAreaHeight();
+        function setInitTextAreaHeight() {
+          const area = div.querySelector('textarea');
+          //const offset = this.offsetHeight - this.clientHeight;
+          const offset = 1 + 1;//borders
+          area.style.height = 'auto';
+          area.style.height = area.scrollHeight + offset + 'px';
         }
 
+        setTimeout(resetAllLayout, 50);
+
+        div.querySelector('textarea').addEventListener('input', autoResize);
+              
+        function autoResize() {
+          const offset = 1 + 1;//borders
+          this.style.height = 'auto';
+          this.style.height = event.target.scrollHeight + offset + 'px';
+          setTimeout(resetAllLayout, 50);
+        }
+
+        const itemActions = listItem.querySelector('.item-action');
+        const dubActions = itemActions.innerHTML;
+
+        itemActions.innerHTML = `<button type="submit" form="edit-item-form-${listItemId}"><img class="update" src="https://img.icons8.com/nolan/32/approve-and-update.png"/></button><button id="cancel-edit-${listItemId}"><img class="cancel" src="https://img.icons8.com/color/32/000000/rollback.png"/></button>`
+
+          const cancelBtn = listItem.querySelector(`#cancel-edit-${listItemId}`);
+          cancelBtn.addEventListener('click', () => {
+            document.querySelector('#search').disabled = false;
+            div.innerHTML = dubContent;
+            itemActions.innerHTML = dubActions;
+            sortable.dragger.enable();
+            setTimeout(resetAllLayout, 50);
+          })
+
+          const editForm = listItem.querySelector(`#edit-item-form-${listItemId}`);
+          editForm.addEventListener('submit', updateRequest);
+
+          function updateRequest(e) {
+            e.preventDefault();
+
+            db.collection("users")
+              .doc(auth.currentUser.uid)
+              .collection('list')
+              .doc(listItemId)
+              .update({
+                content: editForm[`edit-item-input-${listItemId}`].value.trim(),
+              })
+              .then(() => {
+                console.log('updated')
+              })
+          }
+        }
     }
   
     if (ev.target.closest('button').classList.contains('delete')) {
-      const listItem = ev.target.closest('.list-item');
-      const listItemId = listItem.id;
+      if (document.querySelector('#search').value === '') {
+        const listItem = ev.target.closest('.list-item');
+        const listItemId = listItem.id;
 
-      const sortable = sortables.find(sortable => sortable.element.id === listItemId);
-      sortable.dragger.disable();
+        const sortable = sortables.find(sortable => sortable.element.id === listItemId);
+        sortable.dragger.disable();
 
-      db.collection("users")
-            .doc(auth.currentUser.uid)
-            .collection('list')
-            .doc(listItemId)
-            .delete()
-            .then(() => {
-              console.log('deleted')
-            })
+        db.collection("users")
+              .doc(auth.currentUser.uid)
+              .collection('list')
+              .doc(listItemId)
+              .delete()
+              .then(() => {
+                console.log('deleted')
+              })
+      }
     }
 
     if (ev.target.closest('button').classList.contains('complete')) {
@@ -448,15 +518,18 @@ loginForm.addEventListener('submit', (e) => {
 const addForm = document.querySelector('#add-item-form');
 addForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    //get current sign in user uid and assosiated doc by uid
-    if (auth.currentUser) {
+    if (document.querySelector('#search').value === '') {
+          //get current sign in user uid and assosiated doc by uid
+      if (auth.currentUser) {
         db.collection('users').doc(auth.currentUser.uid).collection('list').add({
             content: addForm['add-item-input'].value,
             complete: 'false',
-            createdate: new Date()//put local brawser date
+            createdate: new Date(),//put local brawser date
+            index: 0
         }).then(() => $("#add-item-input").val(""))
-    } else {
+      } else {
         console.log('no user logged in');
+      }
     }
 })
 
@@ -472,26 +545,69 @@ account.addEventListener('click', () => {
 
 
 document.querySelector('#search').oninput = function() {
-  let val = this.value.trim();
-  let complbtn = Array.from(document.querySelectorAll('.complete'));
-  let elasticItems = complbtn.map((item) => item.closest('.list-item'));
-  if (val !== '') {
-    elasticItems.forEach(function(elem) {
-      if (elem.querySelector('.to-replace-content').innerText.search(val) == -1) {
-        //elem.classList.add('hide');
-        elem.querySelector('.to-replace-content').innerHTML = elem.querySelector('.to-replace-content').innerText;
-      } else {
-        //elem.classList.remove('hide');
-        let str = elem.querySelector('.to-replace-content').innerText;
-        elem.querySelector('.to-replace-content').innerHTML = insertMark(str, elem.querySelector('.to-replace-content').innerText.search(val), val.length);
-      }
-    })
-  } else {
-    elasticItems.forEach(function(elem) {
-      //elem.classList.remove('hide');
-      elem.querySelector('.to-replace-content').innerHTML = elem.querySelector('.to-replace-content').innerText;
-    })
-  }
+    let val = this.value.trim();
+
+    let sortablesToShow = [];
+    let sortablesToHide = [];
+
+    if (val !== '') {
+      sortables.forEach((sortable) => sortable.dragger.disable());
+
+      //sortablesToHide.splice(0,sortablesToHide.length);
+
+      sortablesToHide = sortables.filter(sortable => sortable.element.querySelector('.to-replace-content').innerText.search(val) === -1);
+
+      //sortablesToShow.splice(0,sortablesToShow.length);
+
+      sortablesToShow = sortables.filter(sortable => sortable.element.querySelector('.to-replace-content').innerText.search(val) !== -1);
+
+
+        sortablesToHide.forEach(sortable => {
+          sortable.element.classList.add('hide');
+          sortable.element.querySelector('.to-replace-content').innerHTML = sortable.element.querySelector('.to-replace-content').innerText;
+        });
+
+
+        sortablesToShow.forEach((sortable, indx) => {
+          let str = sortable.element.querySelector('.to-replace-content').innerText;
+          sortable.element.querySelector('.to-replace-content').innerHTML = insertMark(str, sortable.element.querySelector('.to-replace-content').innerText.search(val), val.length);
+          sortable.element.classList.remove('hide');
+
+          if (indx === 0) {
+            sortable.location.y = 0;
+          } else {
+            sortable.location.y = sortablesToShow[indx - 1].location.y + sortablesToShow[indx - 1].location.height + gap;
+          };
+
+          if (indx === sortablesToShow.length - 1) {
+            container.style.height = `${sortable.location.y + sortable.location.height + 62}px`
+          }
+
+          gsap.to(sortable.element, {
+            duration: 0.3,
+            x: 0,
+            y: sortable.location.y
+          });
+
+        });
+
+    } else {
+      sortablesToHide.splice(0,sortablesToHide.length);
+      sortablesToShow.splice(0,sortablesToShow.length);
+
+      
+      sortables.forEach((sortable, idex) => {
+        sortable.dragger.enable();
+
+        if (idex === sortables.length - 1) {
+          container.style.height = `${sortable.location.y + sortable.location.height + 62}px`
+        };
+
+        sortable.setIndexSearch(idex);
+        sortable.element.classList.remove('hide');
+        sortable.element.querySelector('.to-replace-content').innerHTML = sortable.element.querySelector('.to-replace-content').innerText;
+      })
+    }
 
 }
 
